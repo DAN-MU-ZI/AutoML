@@ -7,6 +7,9 @@
 4. 일정기준(상위 10개 혹은 역치)을 통해 선정하여 높은 경우의 KFold로 한번더 검증한다.
 5. 선정된 모델의 결과를 저장하여 보고서를 작성한다.
 
+![Alt text](imgs/model_selection_workflow.JPG)  
+![Alt text](imgs/model_selection_results.JPG)
+
 학습과정  
 매 학습마다 T,F로 전처리 사용여부 리스트를 기준으로 전처리 목록을 받아와서 전처리에 적용한다.  
 불러온 전처리 목록을 통해서 모델에 적용한다.  
