@@ -3,30 +3,36 @@ from sklearn.preprocessing import RobustScaler
 
 class ProcessWrapper(BaseEstimator, TransformerMixin):
     def __init__(self,processor):
-        self.preprocessor = processor()
+        self.processor = processor()
         self.is_train = True
         
     def fit(self, X, y=None, **params):
-        print(self.preprocessor, "called")
+        print(self.processor, "called")
         args = {"X":X, "y":y}
-        if hasattr(self.preprocessor,'fit_resample'):
-            self.preprocessor.fit_resample(X,y, **params)
+        if hasattr(self.processor,'fit_resample'):
+            self.processor.fit_resample(X,y, **params)
         else:
-            self.preprocessor.fit(X,y, **params)
+            self.processor.fit(X,y, **params)
         return self
     
     def transform(self, X, y=None):
         args = {"X":X, "y":y}
-        if hasattr(self.preprocessor,'fit_resample'):
+
+        if hasattr(self.processor,'fit_resample'):
             if self.is_train:
-                X, y = self.preprocessor.fit_resample(X,y)
+                X, y = self.processor.fit_resample(**{k: v for k, v in args.items() if k in self.processor.fit_resample.__code__.co_varnames})
         else:
-            processed = self.preprocessor.transform(**{k: v for k, v in args.items() if k in self.preprocessor.transform.__code__.co_varnames})
+            processed = self.processor.transform(**{k: v for k, v in args.items() if k in self.processor.transform.__code__.co_varnames})
             if isinstance(processed, tuple):
                 X, y = processed
             else:
                 X = processed
+
+        self.is_train = False
         return X, y
+
+    def __str__(self) -> str:
+        return str(type(self.processor))
 
 class RemoveEmptyColumn(BaseEstimator, TransformerMixin):
     def __init__(self):
