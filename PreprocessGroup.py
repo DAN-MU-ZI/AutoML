@@ -1,5 +1,16 @@
 import numpy as np
+import itertools
+from Processor import ProcessWrapper
 
+from imblearn.over_sampling import (
+    ADASYN,
+    SMOTE,
+    SMOTENC,
+    SVMSMOTE,
+    BorderlineSMOTE,
+    KMeansSMOTE,
+    RandomOverSampler,
+)
 from imblearn.under_sampling import (
     AllKNN,
     CondensedNearestNeighbour,
@@ -19,13 +30,7 @@ from sklearn.feature_selection import (
     VarianceThreshold,
 )
 from sklearn.impute import KNNImputer, SimpleImputer
-from sklearn.model_selection import (
-    GroupKFold,
-    KFold,
-    StratifiedKFold,
-    TimeSeriesSplit,
-    train_test_split,
-)
+
 from sklearn.preprocessing import (
     KBinsDiscretizer,
     LabelEncoder,
@@ -50,32 +55,67 @@ def generate_lists(k, current_list):
         return res
 
 class PreprocessPipeline():
-    def __init__(self, preprocessors:list = []) -> None:
+    def __init__(self) -> None:
         #oversampler, unsersampler, decomposition, feature_selection, impute,model_selection, sacler
-        self.preprocessors = np.array(preprocessors)
-        pass
+        self.preprocessors = {"impute":[SimpleImputer],#, KNNImputer],
+                            "sampler":[AllKNN,],
+                            #             CondensedNearestNeighbour,
+                            #             EditedNearestNeighbours,
+                            #             InstanceHardnessThreshold,
+                            #             NearMiss,
+                            #             NeighbourhoodCleaningRule,
+                            #             OneSidedSelection,
+                            #             RandomUnderSampler,
+                            #             RepeatedEditedNearestNeighbours,
+                            #             TomekLinks,
+                            #             ADASYN,
+                            #             SMOTE,
+                            #             SMOTENC,
+                            #             SVMSMOTE,
+                            #             BorderlineSMOTE,
+                            #             KMeansSMOTE,
+                            #             RandomOverSampler],
+                            "composition":[PCA, IncrementalPCA, KernelPCA],
+                            #"feat_selection":[SelectFromModel,SelectKBest,VarianceThreshold],
+                            "scaler":[MaxAbsScaler,MinMaxScaler,RobustScaler,StandardScaler],
+                            }
+        self.processGrp = []
     
     def add(self, preprocessors):
-        # 해당 전처리기가 fit transform 함수를 가지고있는지 검사해야함
-        for p in preprocessors:
-            if not (hasattr(p, 'fit') and callable(getattr(p, 'fit'))):
-                raise TypeError(
-                    "해당 전처리는 fit함수를 가지고 있지 않습니다."
-                    "'%s'" % (p, type(p))
-                )
-            elif not (hasattr(p, 'transform') and callable(getattr(p, 'transform'))):
-                raise TypeError(
-                    "해당 전처리는 transform함수를 가지고 있지 않습니다."
-                    "'%s'" % (p, type(p))
-                )
+        for preocess_type, processor in preprocessors:
+            if preocess_type in self.preprocessors.keys():
+                self.preprocessors[preocess_type].append(processor)
+            else:
+                if isinstance(processor, list):
+                    self.preprocessors[preocess_type] = processor
+                else:
+                    self.preprocessors[preocess_type] = [processor]
+        self._updateGrp()
 
-        self.preprocessors = np.append(self.preprocessors, preprocessors)
+    def _updateGrp(self):
+        self.processGrp = []
+        for pipe in self:
+            self.processGrp.append(pipe)
 
     def __iter__(self):
-        numCases = len(self.preprocessors)
-        for flag in generate_lists(numCases, np.array([[]])).reshape((-1, numCases)).astype(bool):
-            pipe = self.preprocessors[flag]
-            if len(pipe):
-                yield pipe
-            
+        baseGrp = {x[0]:x[1] for x in self.preprocessors.items() if x[0].startswith("base")}
+        processGrp = {x[0]:x[1] for x in self.preprocessors.items() if not x[0].startswith("base")}
+        
+        if baseGrp:
+            for k,v in baseGrp.items():
+                for values in itertools.product(*processGrp.values()):
+                    res = []
+                    keys = list(processGrp.keys())
+                    res.extend(values[i] for i in range(len(keys)))
+                    yield keys, res
+        else:
+            for values in itertools.product(*processGrp.values()):
+                res = []
+                keys = list(processGrp.keys())
+                res = [ProcessWrapper(values[i]) for i in range(len(keys))]
+                # res = [values[i] for i in range(len(keys))]
+                yield keys, res
+
+    def __getitem__(self, idx):
+        return self.processGrp[idx]
     
